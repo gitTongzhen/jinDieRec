@@ -394,7 +394,7 @@ def page_items_rec(img,slice = False, use_mp = config.use_mp, process_num = conf
     t1 = time.time()
     #det_results = det_net.det_onnx(img)
     det_results = det_net.det_vino(img)
-    logging.debug(f"det cost: {time.time()-t1}")
+    # logging.debug(f"det cost: {time.time()-t1}")
     texts = []
     icos = []
     for item in det_results:
@@ -409,12 +409,12 @@ def page_items_rec(img,slice = False, use_mp = config.use_mp, process_num = conf
     # # 调用OCR识别
     t2 = time.time()
     ocr_results = ocr_predict(texts,use_mp, process_num)
-    logging.debug(f"OCR num {len(texts)} cost: {time.time()-t2}")
+    # logging.debug(f"OCR num {len(texts)} cost: {time.time()-t2}")
 
     # # 对结果进行分类,区分文字和图标
-    results = {"texts":ocr_results,
-               "icos":icos}
-    return results
+    # results = {"texts":ocr_results,
+    #            "icos":icos}
+    return ocr_results
 
 def py_nms(dets, thresh):
   """Pure Python NMS baseline."""

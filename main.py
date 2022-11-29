@@ -1,79 +1,55 @@
-from pageItemRec import page_items_rec
-import os
-import time
+
+
 import cv2
 import numpy as np
-from PIL import Image 
+import os
+from PIL import Image,ImageDraw,ImageFont
+from pageItemRec import page_items_rec
+import json
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED, FIRST_COMPLETED
+import time
+rect_screen_shot = []
+all_cost = []
+# data_home = "../sumaitong/image1"
+data_home = "./all"
+# data_home = "D:\workspace\chinese_ocr\\test_version4\save1\save1"
+# theard_pool = ThreadPoolExecutor(max_workers=2)
+imgs = [img for img in os.listdir(data_home) if "mask" not in img]
+for item in imgs:
+    image_path = os.path.join(data_home,item)
+    img = cv2.imread(image_path)[:,:,::-1]    # 直接转RGB 
+    # rect_screen_shot.append(img)
+    start_time = time.time()
+    #result = ocr_rec(img)
+    result = page_items_rec(img,use_mp=True,process_num=10)
+    # result = all_result["texts"]
 
-# os.environ["OMP_NUM_THREADS"] = '16'
+    # result = theard_pool.submit(ocr_rec,img)
+    end_time = time.time()
+    cost = end_time-start_time
+    all_cost.append(cost)
+    colors = ['red', 'green', 'blue', "purple"]
+    img1 = Image.fromarray(img)
+    img_detected = img1.copy()
 
-'''
-测试页面文字和图标检测识别
-'''
-
-def make_dirs(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-
-if __name__ == "__main__":
-    
-    # 测试图片路径
-    data_home = "F:/Datasets/securety/PageRec/test_data/test/imgs"
-    # data_home = "F:/Datasets/securety/页面识别/jindie/image1"
-    # data_home = "Y:/zx-AI_lab/数据集/亚马逊页面识别/aws_gt"
-    # data_home = "Y:/zx-AI_lab/数据集/页面识别截图/速卖通全屏"
-    # data_home = "Y:/zx-AI_lab/数据集/页面识别截图/亚马逊窗口"
-    # data_home = "F:/Datasets/securety/tmp"
-    # data_home = "F:/Datasets/securety/PageRec/原始标注数据/测试/jindie/image1"
-    # data_home = "F:/Datasets/securety/PageRec/原始标注数据/测试/chrome"
-
-    imgs = [img for img in os.listdir(data_home) if os.path.splitext(img)[-1] in [".jpg",".png",".webp"]]
-    
-    # 统计耗时
-    times = []
-    start = 0
-    boxes = []
-    for i,item in enumerate(imgs[start:]):
-        print("#"*100)
-        print(f"{i} {item}")
-        image_path = os.path.join(data_home,item)
-        name = os.path.splitext(os.path.basename(image_path))[0]
-        img = np.array(Image.open(image_path).convert("RGB"))           # 直接转RGB
-        draw_img2 = img[:,:,::-1].copy()                                # 转成BGR为了显示和保存结果
-        ori_h,ori_w = img.shape[:2]
+    img_draw = ImageDraw.Draw(img_detected)
+    for i, r in enumerate(result):
+        rect_s,txt,score = r
         
-        t1 = time.time() 
-        icos = []
-        texts = []
+        x1,y1,x2,y2 = np.array(rect_s).reshape(-1)
+        size = max(min(x2-x1,y2-y1) // 2 , 20 )
+        # fillcolor = colors[i % len(colors)]
+        myfont = ImageFont.truetype(os.path.join(os.getcwd(), "./仿宋_GB2312.ttf"), size=size)
+        img_draw.text((x1, y1 - size ), str(txt), font=myfont, fill=colors[i % len(colors)])
+        img_draw.rectangle((x1,y1,x2+x1,y2+y1),outline=colors[i % len(colors)],width=2)
 
-        # 页面元素检测（文本+图标）
-        results = page_items_rec(img,
-                                 slice=False,
-                                 use_mp = True,
-                                 process_num = 10
-                                )
-        trec = time.time()
-        print(f"API cost: {trec-t1}")
-        times.append(trec - t1)
-        boxes.append(len(results["texts"])+len(results["icos"]))
-        
-        img_save_dir = "F:/Datasets/OCR/cls/ori_imgs2"
+    # print(type(img_draw))
+    result_image_path = os.path.join(data_home+"_result",os.path.splitext(item)[0]+".png")
+    img_detected.save(result_image_path)
+    # print(result)
+# ----------------------
 
-        # # 显示文字和图标
-        for i,result in enumerate(results["texts"]):
-            box,text,conf = result
-            print(text)
-            cv2.rectangle(draw_img2,(box[0],box[1]),(box[0]+box[2],box[1]+box[3]),(0,0,255),2)
-        for i,result in enumerate(results["icos"]):
-            box = result 
-            cv2.rectangle(draw_img2,(box[0],box[1]),(box[0]+box[2],box[1]+box[3]),(255,0,0),2)
-
-        cv2.namedWindow(f'result',0)
-        cv2.imshow(f"result",draw_img2)
-        cv2.waitKey(0)
-        # cv2.imwrite(f"result2/{item}",draw_img2)
-        # cv2.imwrite(f"result_chrome/{item}",draw_img2)
-        
-    print(f"平均耗时：{np.mean(times)}")
-    print(f"框数：{boxes}")
+print("real time:")
+times = np.array(all_cost)
+print(times)
+print("avg time:", times.mean(axis=0))
